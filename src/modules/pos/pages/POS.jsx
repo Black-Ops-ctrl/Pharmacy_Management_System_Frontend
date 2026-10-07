@@ -88,6 +88,8 @@ const POS = () => {
 
   const searchInputRef = useRef(null);
   const quantityInputRef = useRef(null);
+  // true while the qty is the untouched default (1) -> the next typed digit replaces it
+  const qtyFreshRef = useRef(true);
   const categoryRefs = useRef([]);
 
   const categories = useMemo(() => ['All', ...categoryRows.map(c => c.name)], [categoryRows]);
@@ -117,6 +119,7 @@ const POS = () => {
   };
 
   const handleMedicineSelect = (med) => {
+    qtyFreshRef.current = true;
     setQuantity(1);
     setSelectedMedicine(med);
   };
@@ -148,6 +151,7 @@ const POS = () => {
       setCart([...cart, { ...medicine, quantity: qty, price: round2(medicine.sale_price), preferredBatchId: null }]);
     }
     setSelectedMedicine(null);
+    qtyFreshRef.current = true;
     setQuantity(1);
     toast.success('Added to cart', `${medicine.name} — ${qtyText(qty, medicine)}`);
   };
@@ -301,13 +305,20 @@ const POS = () => {
       }
 
       if (selectedMedicine) {
-        if (e.key >= '0' && e.key <= '9' && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+        if (e.key >= '0' && e.key <= '9' && !e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
+          // When the qty box itself is focused, let the browser + onChange handle typing normally
+          if (e.target === quantityInputRef.current) {
+            qtyFreshRef.current = false;
+            return;
+          }
           e.preventDefault();
-          const currentVal = quantity.toString();
-          if (currentVal === '1' || currentVal === '' || currentVal === '0') {
-            setQuantity(parseInt(e.key));
+          const currentVal = String(quantity ?? '');
+          // First digit replaces the default value; later digits are appended (so 10, 12, 19, 100 work)
+          if (qtyFreshRef.current || currentVal === '' || currentVal === '0') {
+            qtyFreshRef.current = false;
+            setQuantity(parseInt(e.key, 10));
           } else {
-            setQuantity(parseInt(currentVal + e.key));
+            setQuantity(parseInt(currentVal + e.key, 10));
           }
           return;
         }
